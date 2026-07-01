@@ -1,0 +1,26 @@
+{
+  "name": "@zoft/backend",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build":     "tsc --project tsconfig.json",
+    "dev":       "tsx watch src/index.ts",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint":      "eslint src --ext .ts",
+    "test":      "vitest run"
+  },
+  "dependencies": {
+    "@zoft/contract": "workspace:*",
+    "fastify": "^4.26.0",
+    "@fastify/cors": "^9.0.0",
+    "pino": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0",
+    "tsx": "^4.7.0",
+    "vitest": "^1.4.0",
+    "@vitest/coverage-v8": "^1.4.0"
+  }
+}
