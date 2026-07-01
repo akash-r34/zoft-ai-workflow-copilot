@@ -57,18 +57,15 @@
 - `npx skills add` (without `-g`) installs to `.agents/skills/` in the workspace root
   with a symlink to `~/.claude/`. This satisfies the "local to workspace" requirement.
 
-### Docker (deferred)
-- Docker Desktop is not installed on this machine. The infra files are fully in place
-  (`infra/docker-compose.yml`, `infra/init-db.sql`). The live verification step must
-  be run after Docker Desktop is installed:
-  ```bash
-  docker compose -f infra/docker-compose.yml up -d
-  sleep 5
-  docker compose -f infra/docker-compose.yml exec postgres \
-    psql -U postgres -d zoft -c "SELECT 1 FROM pg_extension WHERE extname = 'vector';"
-  docker compose -f infra/docker-compose.yml down
+### Docker (verified ✅)
+- Docker Desktop 29.6.1 installed post-commit. Verification run completed:
   ```
-  Expected: one row returned.
+  docker compose -f infra/docker-compose.yml up -d   → both containers started
+  SELECT 1 FROM pg_extension WHERE extname = 'vector';  → 1 row (vector extension active)
+  docker compose -f infra/docker-compose.yml down    → stack stopped cleanly
+  ```
+  Note: Docker Compose v5 emits a warning about the `version:` key being obsolete in
+  Compose files — this is cosmetic only, does not affect behavior. Phase 6 can remove it.
 
 ---
 
