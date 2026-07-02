@@ -1,0 +1,167 @@
+// Zoft AI Workflow Copilot — domain schema (Phase 1)
+//
+// The `embedding vector(1536)` column on `node_definition` is deliberately
+// omitted this phase. It ships in Phase 3 as a non-breaking additive
+// migration once the embedding worker exists, avoiding pgvector/shadow-DB
+// coupling in this initial migration. See PHASE1_DONE.md.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum NodeCategory {
+  trigger
+  action
+}
+
+enum MessageRole {
+  user
+  assistant
+}
+
+enum RunStatus {
+  pending
+  running
+  succeeded
+  failed
+  cancelled
+  timed_out
+}
+
+enum JobStatus {
+  pending
+  processing
+  done
+  failed
+  dead_lettered
+}
+
+/// Root entity; holds a pointer to its current immutable version.
+model Workflow {
+  id                String            @id @default(cuid())
+  name              String
+  ownerId           String
+  currentVersionId  String?           @unique
+  currentVersion    WorkflowVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id])
+  versions          WorkflowVersion[] @relation("WorkflowVersions")
+  conversations     Conversation[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@map("workflow")
+}
+
+/// Immutable, append-only. Never update a row — only insert.
+model WorkflowVersion {
+  id              String    @id @default(cuid())
+  workflowId      String
+  workflow        Workflow  @relation("WorkflowVersions", fields: [workflowId], references: [id])
+  version         Int
+  graph           Json
+  createdBy       String
+  changeSummary   String
+  parentVersionId String?
+  createdAt       DateTime  @default(now())
+  currentOf       Workflow? @relation("CurrentVersion")
+
+  @@unique([workflowId, version])
+  @@map("workflow_version")
+}
+
+/// Data-driven node catalog. `type` is the primary key (e.g. "slack.send_message").
+/// Adding a new node type is a row insert, not a redeploy.
+model NodeDefinition {
+  type         String       @id
+  category     NodeCategory
+  displayName  String
+  description  String
+  provider     String
+  configSchema Json
+  inputs       Json
+  outputs      Json
+  nodeVersion  Int          @default(1)
+
+  @@map("node_definition")
+}
+
+/// Chat session; links to a workflow once one exists.
+model Conversation {
+  id         String    @id @default(cuid())
+  workflowId String?
+  workflow   Workflow? @relation(fields: [workflowId], references: [id])
+  title      String    @default("New conversation")
+  messages   Message[]
+  runs       Run[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@map("conversation")
+}
+
+/// User/assistant chat messages. `runId` links an assistant message to the run
+/// that produced it — kept as a plain scalar (no FK) since a run may not exist
+/// yet when the message row is first written.
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  role           MessageRole
+  content        String
+  runId          String?
+  createdAt      DateTime     @default(now())
+
+  @@map("message")
+}
+
+/// One AI turn's lifecycle.
+model Run {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  status         RunStatus
+  error          Json?
+  tokenUsage     Int?
+  events         RunEvent[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("run")
+}
+
+/// Persisted SSE trace. `seq` is monotonic per run — enforced in application
+/// code, not the database. Backs replay (Last-Event-ID) and the frontend
+/// activity timeline.
+model RunEvent {
+  id        String   @id @default(cuid())
+  runId     String
+  run       Run      @relation(fields: [runId], references: [id])
+  seq       Int
+  type      String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@index([runId, seq])
+  @@map("run_event")
+}
+
+/// Background job bookkeeping for BullMQ workers (embedding generation, heavy
+/// validation, external lookups). Idempotency key guards against duplicate
+/// enqueues; retries/backoff live in the worker, not this row.
+model Job {
+  id             String    @id @default(cuid())
+  idempotencyKey String    @unique
+  type           String
+  status         JobStatus
+  payload        Json
+  attempts       Int       @default(0)
+  lastError      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("job")
+}
