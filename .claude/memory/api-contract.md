@@ -1,7 +1,10 @@
 # API contract — detail
 
-Referenced from the root `CLAUDE.md`. No HTTP routes exist yet (Phase 3+) — this is the
-design target.
+Referenced from the root `CLAUDE.md`. No **real backend** HTTP routes exist yet
+(that's Phase 3+) — this remains the design target for `apps/backend`. Every route
+below is, however, already implemented against this exact contract by the frontend's
+mock backend (`apps/frontend/mock/server.ts`, dev-only) — see
+`.claude/memory/frontend-architecture.md` and `PHASE4_5_DONE.md`.
 
 - **REST** for commands and reads.
 - **SSE** (`GET /api/runs/:runId/stream`) for the AI run stream. Not WebSockets — the

@@ -143,9 +143,16 @@ merging.
 | 1 | Prisma schema, node catalog seed, deterministic core + tests | ✅ Done |
 | 2 | LLM provider abstraction, agent loop, RAG, self-correction | Next |
 | 3 | SSE streaming, BullMQ workers, cancellation, circuit breaker | — |
-| 4 | Frontend chat core, SSE client, activity timeline | — |
-| 5 | React Flow viz, diff highlight, version history, failure states | — |
+| 4 | Frontend chat core, SSE client, activity timeline | ✅ Done (built early, against a mock backend — see below) |
+| 5 | React Flow viz, diff highlight, version history, failure states | ✅ Done (built early, against a mock backend — see below) |
 | 6 | Production Dockerfiles, architecture docs, API docs, demo video | — |
+
+**Note on ordering:** Phases 4–5 (the frontend) were built out of sequence, ahead of
+the backend's Phase 2–3, against a self-contained mock backend
+(`apps/frontend/mock/`) that implements the real `packages/contract` REST + SSE
+surface. This is a deliberate deviation from the plan's phase order, not a change to
+the plan itself — Phase 2 (backend AI orchestration) is still the next backend
+milestone. Detail: `.claude/memory/build-phases.md`.
 
 Per-phase detail (what each adds, decisions made, deviations from spec):
 `.claude/memory/build-phases.md`.
@@ -168,4 +175,4 @@ under `.claude/memory/`, split by topic:
 | `.claude/memory/key-files.md` | Quick-reference table of the most important files |
 
 Other references: `Plans/` (original design docs, do not edit), `PHASE0_DONE.md` /
-`PHASE1_DONE.md` (completed-phase decision logs and test output).
+`PHASE1_DONE.md` / `PHASE4_5_DONE.md` (completed-phase decision logs and test output).
