@@ -57,6 +57,10 @@ model Workflow {
 }
 
 /// Immutable, append-only. Never update a row — only insert.
+/// Exception: `archivedAt` (below) — a lifecycle annotation, never the
+/// content columns (graph/version/createdBy/changeSummary/parentVersionId),
+/// and never written through core/version-applier.ts. See
+/// workers/archival-worker.ts.
 model WorkflowVersion {
   id              String    @id @default(cuid())
   workflowId      String
@@ -68,6 +72,13 @@ model WorkflowVersion {
   parentVersionId String?
   createdAt       DateTime  @default(now())
   currentOf       Workflow? @relation("CurrentVersion")
+
+  /// PRD v1.1 Decision #3: retain all versions indefinitely, never delete —
+  /// this column only marks a version as old enough to be considered
+  /// archived (workers/archival-worker.ts, ARCHIVE_AFTER_DAYS env, default
+  /// 90). Read endpoints (routes/workflows.ts) deliberately do not filter on
+  /// it or expose it in any DTO — see REMAINING.md for why.
+  archivedAt      DateTime?
 
   @@unique([workflowId, version])
   @@map("workflow_version")
