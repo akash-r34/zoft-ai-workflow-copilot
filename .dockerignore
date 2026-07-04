@@ -1,0 +1,16 @@
+node_modules
+**/node_modules
+dist
+**/dist
+.next
+**/.next
+coverage
+**/coverage
+.turbo
+**/.turbo
+.git
+test-evidence
+apps/frontend/mock/.data.json
+*.log
+.env
+**/.env
