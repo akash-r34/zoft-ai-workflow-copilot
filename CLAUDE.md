@@ -41,6 +41,8 @@ zoft-copilot/
     architecture.md  System design, the core invariant, a run's full data flow
     api.md           REST + SSE reference
     demo.webm        Recorded walkthrough (Playwright, against the dockerized stack)
+    developer-guide/ Full onboarding guide for a newcomer — file:line-cited, chapter
+                     per subsystem, an end-to-end request trace. See its INDEX.md.
   .github/workflows/ci.yml
 ```
 
@@ -195,6 +197,7 @@ reader (not just future-Claude):
 
 | File | Covers |
 |------|--------|
+| `docs/developer-guide/INDEX.md` | **Start here for full onboarding.** A from-scratch, file:line-cited guide (17 chapters) for a developer who has never seen this codebase — product orientation, every subsystem in depth, a full end-to-end request trace, testing, ops, and "how to extend" recipes. Complements (doesn't duplicate) the two docs below. |
 | `docs/architecture.md` | System design, the core invariant, a run's full data flow incl. Redis/BullMQ, what's deliberately not built |
 | `docs/api.md` | REST + SSE endpoint reference, generated from what's actually implemented |
 | `.claude/memory/backend-architecture.md` | Domain model, deterministic core (`src/core/`), agent tools, LLM provider abstraction, self-correction loop, SSE/run lifecycle, background workers, prototype stubs |
