@@ -17,7 +17,7 @@ export const KNOWN_TOOLS = [
 ] as const;
 export type ToolName = (typeof KNOWN_TOOLS)[number];
 
-export function executeTool(ctx: ToolContext, tool: string, input: unknown): ToolResult {
+export async function executeTool(ctx: ToolContext, tool: string, input: unknown): Promise<ToolResult> {
   switch (tool as ToolName) {
     case "search_nodes":
       return searchNodes(ctx, (input ?? {}) as SearchNodesInput);

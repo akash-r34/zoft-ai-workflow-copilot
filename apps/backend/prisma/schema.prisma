@@ -86,6 +86,17 @@ model NodeDefinition {
   outputs      Json
   nodeVersion  Int          @default(1)
 
+  /// Populated by workers/embedding-worker.ts via the deterministic
+  /// MockEmbedder (see src/embeddings/) — no real embedding API involved,
+  /// so 256 dims is plenty for a handful of catalog rows (the original
+  /// vector(1536) noted in earlier phases was sized for a real model that
+  /// doesn't exist keyless). Prisma has no first-class vector type;
+  /// Unsupported(...) keeps `migrate` honest about the column's real type
+  /// without trying (and failing) to model it, while still tracking it in
+  /// the schema. All reads/writes go through raw SQL
+  /// (src/catalog/vector-search.ts, src/workers/embedding-worker.ts).
+  embedding    Unsupported("vector(256)")?
+
   @@map("node_definition")
 }
 
