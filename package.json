@@ -6,7 +6,8 @@
     "dev":       "turbo run dev --parallel",
     "lint":      "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "test":      "turbo run test"
+    "test":      "turbo run test",
+    "demo":      "pnpm --filter @zoft/frontend dev"
   },
   "devDependencies": {
     "turbo": "latest",

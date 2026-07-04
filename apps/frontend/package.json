@@ -4,24 +4,37 @@
   "private": true,
   "scripts": {
     "build": "next build",
-    "dev": "next dev -p 3000",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "dev": "concurrently -n ui,mock -c blue,magenta \"next dev -p 3000\" \"tsx watch mock/server.ts\"",
+    "mock": "tsx watch mock/server.ts",
+    "typecheck": "tsc --project tsconfig.json --noEmit && tsc --project mock/tsconfig.json --noEmit",
     "lint": "next lint",
     "test": "vitest run"
   },
   "dependencies": {
+    "@dagrejs/dagre": "^3.0.0",
+    "@tanstack/react-query": "^5.101.2",
+    "@xyflow/react": "^12.11.1",
     "@zoft/contract": "workspace:*",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.23.0",
     "next": "^14.2.0",
     "react": "^18.3.0",
-    "react-dom": "^18.3.0"
+    "react-dom": "^18.3.0",
+    "zod": "^3.22.0",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@fastify/cors": "^9.0.1",
+    "@types/node": "^20.19.43",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.0",
+    "concurrently": "^10.0.3",
     "eslint-config-next": "14.2.0",
+    "fastify": "^4.29.1",
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",
+    "tsx": "^4.22.4",
     "typescript": "^5.4.0",
     "vitest": "^1.4.0"
   }
