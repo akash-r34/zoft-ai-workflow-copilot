@@ -50,11 +50,17 @@ function newId(): string {
 }
 
 // ── Conversations ─────────────────────────────────────────────────────────
+// Must match apps/backend/src/runs/run-service.ts's identical default
+// exactly — it's how maybeTitleConversation recognizes "never renamed yet"
+// without a separate boolean column. Keeps both backends' behavior in sync.
+const DEFAULT_CONVERSATION_TITLE = "New conversation";
+const TITLE_MAX_LENGTH = 50;
+
 export function createConversation(title?: string): StoredConversation {
   const now = nowIso();
   const conversation: StoredConversation = {
     id: newId(),
-    title: title && title.trim().length > 0 ? title.trim() : "New conversation",
+    title: title && title.trim().length > 0 ? title.trim() : DEFAULT_CONVERSATION_TITLE,
     workflowId: null,
     createdAt: now,
     updatedAt: now,
@@ -72,6 +78,30 @@ export function listConversations(): StoredConversation[] {
 
 export function getConversation(id: string): StoredConversation | undefined {
   return snapshot.conversations[id];
+}
+
+/**
+ * Truncates the first user message into a short, human-scannable
+ * conversation title — cheap, no LLM call. Cuts at the last word boundary
+ * before the limit (so it doesn't end mid-word) unless that boundary is too
+ * close to the start, in which case it hard-cuts rather than producing a
+ * near-empty title. Mirrors apps/backend/src/runs/run-service.ts exactly.
+ */
+export function deriveTitleFromMessage(content: string): string {
+  const cleaned = content.trim().replace(/\s+/g, " ");
+  if (cleaned.length <= TITLE_MAX_LENGTH) return cleaned;
+  const truncated = cleaned.slice(0, TITLE_MAX_LENGTH);
+  const lastSpace = truncated.lastIndexOf(" ");
+  const base = lastSpace > 20 ? truncated.slice(0, lastSpace) : truncated;
+  return `${base}…`;
+}
+
+/** Renames a conversation from its first message, but only once — a conversation already renamed (or explicitly titled at creation) is left alone. */
+export function maybeTitleConversation(conversationId: string, content: string): void {
+  const conversation = snapshot.conversations[conversationId];
+  if (!conversation || conversation.title !== DEFAULT_CONVERSATION_TITLE) return;
+  conversation.title = deriveTitleFromMessage(content);
+  persist();
 }
 
 // ── Messages ──────────────────────────────────────────────────────────────

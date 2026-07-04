@@ -44,6 +44,7 @@ import {
   listConversations,
   listMessages,
   listVersions,
+  maybeTitleConversation,
   requestCancel,
   resolveProposal,
   restoreVersion,
@@ -149,6 +150,7 @@ async function main(): Promise<void> {
       throw new ApiErrorException("CONVERSATION_NOT_FOUND", `conversation ${id} not found`, 404);
     const body = CreateRunBodySchema.parse(request.body);
     const workflow = ensureWorkflow(id);
+    maybeTitleConversation(id, body.content);
     const run = createRun(id, workflow.id);
     const message = addMessage({
       conversationId: id,
