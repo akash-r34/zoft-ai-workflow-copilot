@@ -18,6 +18,7 @@ export type SseEvent =
   | (BaseEvent & { event: "tool.result";          data: { callId: string; ok: boolean; result?: unknown; error?: string } })
   | (BaseEvent & { event: "validation.progress";  data: { stage: string; pct: number } })
   | (BaseEvent & { event: "validation.error";     data: { errors: ValidationError[] } })
+  | (BaseEvent & { event: "workflow.proposed";     data: { workflowId: string; version: number; graph: WorkflowGraph; diff: WorkflowDiff; summary: string } })
   | (BaseEvent & { event: "workflow.updated";      data: { workflowId: string; version: number; graph: WorkflowGraph; diff: WorkflowDiff } })
   | (BaseEvent & { event: "retry";                data: { attempt: number; max: number; reason: string } })
   | (BaseEvent & { event: "provider.switched";    data: { from: string; to: string; reason: string } })

@@ -93,3 +93,18 @@ export const SimulateStripePaymentBodySchema = z.object({
   currency: z.string().default("usd"),
 });
 export type SimulateStripePaymentBody = z.infer<typeof SimulateStripePaymentBodySchema>;
+
+// ── Approval gate ─────────────────────────────────────────────────────────────
+// A run that has produced a validated candidate graph pauses (emits
+// `workflow.proposed` over SSE, see events.ts) and waits for one of these two
+// calls before the version applier ever writes. See CLAUDE.md's core
+// invariant: the AI proposes, a human (or an explicit auto-approve config)
+// authorizes, deterministic code applies.
+export interface ApproveRunResponseDto {
+  status:  "approved";
+  version: number;
+}
+
+export interface RejectRunResponseDto {
+  status: "rejected";
+}
