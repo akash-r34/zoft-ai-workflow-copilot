@@ -28,14 +28,19 @@ audit trail, and a well-defined recovery surface for every LLM failure mode.
 ```
 zoft-copilot/
   apps/
-    backend/      Fastify API + AI orchestration (Node.js + TypeScript, ESM)
+    backend/      Fastify API + AI orchestration + BullMQ workers (Node.js, ESM)
     frontend/     Chat UI + workflow viz (Next.js 14 App Router)
   packages/
     contract/     Shared types, Zod schemas, SSE event union — the API boundary
   infra/
-    docker-compose.yml   Postgres (pgvector/pgvector:pg16) + Redis
+    docker-compose.yml   Postgres (pgvector/pgvector:pg16) + Redis + backend +
+                         worker + frontend — `docker compose up` runs the full
+                         app stack from a clean checkout, no API keys
     init-db.sql          CREATE EXTENSION IF NOT EXISTS vector
   docs/
+    architecture.md  System design, the core invariant, a run's full data flow
+    api.md           REST + SSE reference
+    demo.webm        Recorded walkthrough (Playwright, against the dockerized stack)
   .github/workflows/ci.yml
 ```
 
@@ -57,12 +62,17 @@ pnpm -r lint                        # lint all packages (zero errors required)
 pnpm test                           # run all tests via Turbo
 
 # Local infra (requires Docker Desktop)
-docker compose -f infra/docker-compose.yml up -d
+docker compose -f infra/docker-compose.yml up -d       # Postgres + Redis only
 docker compose -f infra/docker-compose.yml down
+
+# Full app stack in Docker (backend + worker + frontend too), no API keys needed
+docker compose -f infra/docker-compose.yml up -d --build
 ```
 
 For development: `pnpm dev` runs all packages in parallel via Turbo. Backend on
-port 3001, frontend on port 3000.
+port 3001, frontend on port 3000. The background worker process (BullMQ: embedding,
+catalog-integrity validation, version archival) is separate from the API server —
+run it with `pnpm --filter @zoft/backend worker`.
 
 ---
 
@@ -108,11 +118,19 @@ Format check is part of CI. Run `pnpm exec prettier --write .` to format.
 Backend (`.env.example`):
 ```
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/zoft?schema=public"
-REDIS_URL="redis://localhost:6379"
+REDIS_URL="redis://localhost:6379"      # hard dependency now — SSE pub/sub + BullMQ
 PORT=3001
 LOG_LEVEL=info
-LLM_PROVIDER=mock          # set to "anthropic" to use the real API
+LLM_PROVIDER=mock          # set to "anthropic" to use the real API (not implemented — see REMAINING.md)
 ANTHROPIC_API_KEY=         # only needed when LLM_PROVIDER=anthropic
+SELF_CORRECTION_BUDGET=1  # repair attempts after a failed proposal (PRD v1.1 Decision #2)
+RUN_DEADLINE_MS=6000
+APPROVAL_REQUIRED=true    # PRD v1.1 Decision #1 — human approve/reject before any write
+PROVIDER_FAILURE_THRESHOLD=3        # providers/circuit-breaker.ts
+PROVIDER_BREAKER_COOLDOWN_MS=30000
+ARCHIVE_AFTER_DAYS=90                # PRD v1.1 Decision #3 — workers/archival-worker.ts
+ARCHIVE_CRON="0 3 * * *"
+WORKER_CONCURRENCY=2
 ```
 
 Frontend (`.env.example`):
@@ -141,24 +159,27 @@ merging.
 |-------|-------------|--------|
 | 0 | Monorepo scaffold, contract package, Docker infra | ✅ Done |
 | 1 | Prisma schema, node catalog seed, deterministic core + tests | ✅ Done |
-| 2 | LLM provider abstraction, agent loop, RAG, self-correction | ✅ Done (core) — advanced pieces in `REMAINING.md` |
-| 3 | SSE streaming, BullMQ workers, cancellation, circuit breaker | ✅ Done (core) — advanced pieces in `REMAINING.md` |
+| 2 | LLM provider abstraction, agent loop, RAG, self-correction | ✅ Done — only `AnthropicProvider` itself remains (`REMAINING.md`) |
+| 3 | SSE streaming, BullMQ workers, cancellation, circuit breaker | ✅ Done |
 | 4 | Frontend chat core, SSE client, activity timeline | ✅ Done (built early, against a mock backend — see below) |
 | 5 | React Flow viz, diff highlight, version history, failure states | ✅ Done (built early, against a mock backend — see below) |
-| 6 | Production Dockerfiles, architecture docs, API docs, demo video | — (see `REMAINING.md`) |
+| 6 | Production Dockerfiles, architecture docs, API docs, demo video | ✅ Done |
 
 **Note on ordering:** Phases 4–5 (the frontend) were built out of sequence, ahead of
 the backend's Phase 2–3, against a self-contained mock backend
 (`apps/frontend/mock/`) that implements the real `packages/contract` REST + SSE
-surface. Phase 2–3 (core) has since landed: a real Postgres-backed Fastify backend
-with real REST + SSE, a real agent loop driven by the deterministic `MockProvider`,
-and (per PRD v1.1 Decision #1) a mandatory human approval gate between validation
-and commit. The frontend runs against it with no changes beyond the new
-`ApprovalPanel` UI the approval gate itself required. `apps/frontend/mock/` is kept
-as a faithful, independent peer implementation (both now emit `workflow.proposed`
-and expose `/approve`/`/reject`), not replaced. Detail: `.claude/memory/build-phases.md`.
-Deferred advanced pieces (real `AnthropicProvider`, provider circuit breaker,
-pgvector RAG, BullMQ workers, all of Phase 6): `REMAINING.md` at repo root.
+surface. Phase 2–3 has since landed in full: a real Postgres-backed Fastify backend
+with real REST + SSE (now Redis pub/sub-backed for cross-process delivery), a real
+agent loop driven by the deterministic `MockProvider` behind a real `ProviderRouter`
++ circuit breaker, pgvector RAG, BullMQ workers (embedding, catalog-integrity
+validation, version archival), and (per PRD v1.1 Decision #1) a mandatory human
+approval gate between validation and commit. The frontend runs against it with no
+changes beyond the `ApprovalPanel` UI the approval gate itself required.
+`apps/frontend/mock/` is kept as a faithful, independent peer implementation, not
+replaced — it was not touched by the Phase 2–3 backend-internals work since none of
+it changes the contract surface. Detail: `.claude/memory/build-phases.md`. The one
+deliberately-deferred item (needs a paid API key to verify): a real
+`AnthropicProvider` — see `REMAINING.md` at repo root.
 
 Per-phase detail (what each adds, decisions made, deviations from spec):
 `.claude/memory/build-phases.md`.
@@ -169,10 +190,13 @@ Per-phase detail (what each adds, decisions made, deviations from spec):
 
 The sections above are the load-bearing rules and the commands you need on every
 task. Everything else — full architecture, API shapes, file-by-file breakdowns — lives
-under `.claude/memory/`, split by topic:
+under `.claude/memory/`, split by topic, plus two polished docs meant for an outside
+reader (not just future-Claude):
 
 | File | Covers |
 |------|--------|
+| `docs/architecture.md` | System design, the core invariant, a run's full data flow incl. Redis/BullMQ, what's deliberately not built |
+| `docs/api.md` | REST + SSE endpoint reference, generated from what's actually implemented |
 | `.claude/memory/backend-architecture.md` | Domain model, deterministic core (`src/core/`), agent tools, LLM provider abstraction, self-correction loop, SSE/run lifecycle, background workers, prototype stubs |
 | `.claude/memory/frontend-architecture.md` | State split (TanStack Query vs Zustand), SSE consumption, three-region layout, workflow visualisation, failure state rule |
 | `.claude/memory/contract-package.md` | File-by-file breakdown of `packages/contract` |

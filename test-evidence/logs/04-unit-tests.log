@@ -7,48 +7,54 @@ $ turbo run test
 
 @zoft/contract:build: cache hit, replaying logs 602e80d8c3512eba
 @zoft/contract:build: $ tsc --project tsconfig.json
-@zoft/frontend:test: cache miss, executing 9b8ef96957c17886
-@zoft/backend:test: cache miss, executing 4391b09f51ae10ef
-@zoft/backend:test: $ vitest run
+@zoft/frontend:test: cache hit, replaying logs 7c5900fc97ae28c9
+@zoft/backend:test: cache hit, replaying logs 54dc726ce25aeb23
 @zoft/frontend:test: $ vitest run
 @zoft/frontend:test: 
 @zoft/frontend:test:  RUN  v1.6.1 /Users/akashr/Zoft AI - Assignment/apps/frontend
-@zoft/frontend:test: 
+@zoft/backend:test: $ vitest run
 @zoft/backend:test: 
 @zoft/backend:test:  RUN  v1.6.1 /Users/akashr/Zoft AI - Assignment/apps/backend
 @zoft/backend:test: 
-@zoft/backend:test:  ✓ src/catalog/__tests__/catalog-service.test.ts  (6 tests) 6ms
-@zoft/backend:test:  ✓ src/dto/__tests__/diff.test.ts  (6 tests) 9ms
-@zoft/backend:test:  ✓ src/tools/__tests__/propose-operations.test.ts  (4 tests) 51ms
-@zoft/backend:test:  ✓ src/core/__tests__/applier.test.ts  (7 tests) 5ms
-@zoft/backend:test:  ↓ src/runs/__tests__/event-bus.integration.test.ts  (3 tests | 3 skipped)
-@zoft/backend:test:  ✓ src/core/__tests__/validator.test.ts  (10 tests) 55ms
+@zoft/backend:test:  ✓ src/core/__tests__/applier.test.ts  (7 tests) 4ms
 @zoft/backend:test:  ↓ src/core/__tests__/version-applier.integration.test.ts  (3 tests | 3 skipped)
-@zoft/frontend:test:  ✓ src/__tests__/step-map.test.ts  (10 tests) 5ms
-@zoft/frontend:test:  ✓ src/__tests__/run-store.test.ts  (15 tests) 5ms
-@zoft/backend:test:  ✓ src/core/__tests__/version-applier.test.ts  (8 tests) 48ms
-@zoft/backend:test:  ✓ src/__tests__/placeholder.test.ts  (1 test) 2ms
-@zoft/backend:test:  ✓ src/tools/__tests__/registry.test.ts  (6 tests) 17ms
-@zoft/backend:test:  ✓ src/core/__tests__/applier.property.test.ts  (1 test) 7ms
-@zoft/backend:test:  ✓ src/providers/__tests__/mock-provider.test.ts  (13 tests) 204ms
+@zoft/backend:test:  ✓ src/providers/__tests__/router.test.ts  (5 tests) 4ms
+@zoft/backend:test:  ↓ src/runs/__tests__/event-bus.integration.test.ts  (4 tests | 4 skipped)
+@zoft/backend:test:  ✓ src/tools/__tests__/propose-operations.test.ts  (4 tests) 56ms
+@zoft/backend:test:  ✓ src/core/__tests__/validator.test.ts  (10 tests) 145ms
+@zoft/backend:test:  ✓ src/core/__tests__/version-applier.test.ts  (8 tests) 130ms
+@zoft/backend:test:  ✓ src/providers/__tests__/circuit-breaker.test.ts  (6 tests) 1ms
+@zoft/backend:test:  ✓ src/dto/__tests__/diff.test.ts  (6 tests) 3ms
+@zoft/backend:test:  ✓ src/catalog/__tests__/catalog-service.test.ts  (6 tests) 2ms
+@zoft/backend:test:  ✓ src/workers/__tests__/validation-worker.test.ts  (6 tests) 57ms
+@zoft/backend:test:  ↓ src/catalog/__tests__/vector-search.integration.test.ts  (3 tests | 3 skipped)
+@zoft/backend:test:  ✓ src/providers/__tests__/mock-provider.test.ts  (13 tests) 216ms
+@zoft/backend:test:  ✓ src/tools/__tests__/registry.test.ts  (6 tests) 43ms
+@zoft/backend:test:  ✓ src/embeddings/__tests__/mock-embedder.test.ts  (6 tests) 5ms
+@zoft/backend:test:  ✓ src/embeddings/__tests__/serialize.test.ts  (3 tests) 2ms
+@zoft/backend:test:  ✓ src/__tests__/placeholder.test.ts  (1 test) 1ms
+@zoft/backend:test:  ✓ src/workers/__tests__/archival-worker.test.ts  (5 tests) 1ms
+@zoft/backend:test:  ✓ src/runs/__tests__/run-service.test.ts  (6 tests) 2ms
+@zoft/backend:test:  ✓ src/core/__tests__/applier.property.test.ts  (1 test) 9ms
 @zoft/backend:test: 
-@zoft/backend:test:  Test Files  10 passed | 2 skipped (12)
-@zoft/backend:test:       Tests  62 passed | 6 skipped (68)
-@zoft/backend:test:    Start at  16:55:04
-@zoft/backend:test:    Duration  540ms (transform 266ms, setup 0ms, collect 1.26s, tests 404ms, environment 1ms, prepare 984ms)
+@zoft/backend:test:  Test Files  17 passed | 3 skipped (20)
+@zoft/backend:test:       Tests  99 passed | 10 skipped (109)
+@zoft/backend:test:    Start at  22:27:34
+@zoft/backend:test:    Duration  708ms (transform 648ms, setup 45ms, collect 1.73s, tests 681ms, environment 2ms, prepare 1.56s)
 @zoft/backend:test: 
-@zoft/frontend:test:  ✓ src/__tests__/dagre-layout.test.ts  (7 tests) 6ms
+@zoft/frontend:test: 
+@zoft/frontend:test:  ✓ src/__tests__/step-map.test.ts  (10 tests) 2ms
+@zoft/frontend:test:  ✓ src/__tests__/run-store.test.ts  (15 tests) 2ms
+@zoft/frontend:test:  ✓ src/__tests__/dagre-layout.test.ts  (7 tests) 12ms
 @zoft/frontend:test: 
 @zoft/frontend:test:  Test Files  3 passed (3)
 @zoft/frontend:test:       Tests  32 passed (32)
-@zoft/frontend:test:    Start at  16:55:04
-@zoft/frontend:test:    Duration  584ms (transform 196ms, setup 0ms, collect 354ms, tests 16ms, environment 0ms, prepare 151ms)
+@zoft/frontend:test:    Start at  22:27:34
+@zoft/frontend:test:    Duration  721ms (transform 238ms, setup 0ms, collect 450ms, tests 16ms, environment 0ms, prepare 157ms)
 @zoft/frontend:test: 
 
  Tasks:    3 successful, 3 total
-Cached:    1 cached, 3 total
-  Time:    1.186s 
+Cached:    3 cached, 3 total
+  Time:    33ms >>> FULL TURBO
 
- WARNING  no output files found for task @zoft/backend#test. Please check your `outputs` key in `turbo.json`
- WARNING  no output files found for task @zoft/frontend#test. Please check your `outputs` key in `turbo.json`
 test exit: 0

@@ -1,8 +1,8 @@
 Scope: 3 of 4 workspace projects
 packages/contract build$ tsc --project tsconfig.json
 packages/contract build: Done
-apps/backend build$ tsc --project tsconfig.json
 apps/frontend build$ next build
+apps/backend build$ tsc --project tsconfig.json
 apps/frontend build:   ▲ Next.js 14.2.35
 apps/frontend build:    Creating an optimized production build ...
 apps/backend build: Done

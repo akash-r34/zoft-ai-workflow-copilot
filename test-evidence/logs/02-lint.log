@@ -3,7 +3,7 @@ packages/contract lint$ eslint src --ext .ts
 packages/contract lint: Done
 apps/frontend lint$ next lint
 apps/backend lint$ eslint src --ext .ts
-apps/backend lint: Done
 apps/frontend lint: ✔ No ESLint warnings or errors
 apps/frontend lint: Done
+apps/backend lint: Done
 lint exit: 0
