@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { PrismaClient } from "@prisma/client";
-import { applyVersion } from "../version-applier.js";
+import { applyVersion, restoreVersion } from "../version-applier.js";
 import type { CatalogEntry, Operation, WorkflowGraph } from "../types.js";
 
 const CATALOG: CatalogEntry[] = [
@@ -87,6 +87,9 @@ interface FakeDb {
       where: { workflowId: string };
     }): Promise<{ _max: { version: number | null } }>;
     create(args: { data: Omit<FakeVersionRow, "id"> }): Promise<FakeVersionRow>;
+    findUnique(args: {
+      where: { workflowId_version: { workflowId: string; version: number } };
+    }): Promise<FakeVersionRow | null>;
   };
   $transaction<T>(fn: (tx: FakeDb) => Promise<T>): Promise<T>;
 }
@@ -132,6 +135,13 @@ function createFakePrisma(workflow: FakeWorkflowRow, versions: FakeVersionRow[] 
         versions.push(row);
         createCalls.push(row);
         return Promise.resolve(row);
+      },
+      findUnique: (args: {
+        where: { workflowId_version: { workflowId: string; version: number } };
+      }) => {
+        const { workflowId, version } = args.where.workflowId_version;
+        const found = versions.find((v) => v.workflowId === workflowId && v.version === version);
+        return Promise.resolve(found ?? null);
       },
     },
     $transaction: <T>(fn: (tx: FakeDb) => Promise<T>): Promise<T> => fn(db),
@@ -211,6 +221,99 @@ describe("applyVersion", () => {
 
     await expect(
       applyVersion(db as unknown as PrismaClient, "does-not-exist", VALID_OPS, CATALOG, "ai", "x"),
+    ).rejects.toThrow(/not found/);
+  });
+});
+
+describe("restoreVersion", () => {
+  const graphV1: WorkflowGraph = {
+    nodes: [{ id: "t1", type: "stripe.payment_received", config: {}, position: { x: 0, y: 0 } }],
+    edges: [],
+  };
+  const graphV2: WorkflowGraph = {
+    nodes: [
+      { id: "t1", type: "stripe.payment_received", config: {}, position: { x: 0, y: 0 } },
+      {
+        id: "a1",
+        type: "slack.send_message",
+        config: { channel: "#payments", text: "hi" },
+        position: { x: 200, y: 0 },
+      },
+    ],
+    edges: [{ id: "e1", source: "t1", target: "a1" }],
+  };
+
+  function seedTwoVersions() {
+    return createFakePrisma({ id: "wf1", currentVersionId: "v2" }, [
+      {
+        id: "v1",
+        workflowId: "wf1",
+        version: 1,
+        graph: graphV1,
+        createdBy: "ai",
+        changeSummary: "created",
+        parentVersionId: null,
+      },
+      {
+        id: "v2",
+        workflowId: "wf1",
+        version: 2,
+        graph: graphV2,
+        createdBy: "ai",
+        changeSummary: "added slack",
+        parentVersionId: "v1",
+      },
+    ]);
+  }
+
+  it("re-saves the target version's graph verbatim as a new version", async () => {
+    const { db, createCalls, updateCalls } = seedTwoVersions();
+
+    const result = await restoreVersion(db as unknown as PrismaClient, "wf1", 1, CATALOG);
+
+    expect("error" in result).toBe(false);
+    if (!("error" in result)) {
+      expect(result.version).toBe(3);
+      expect(result.graph).toEqual(graphV1);
+    }
+    expect(createCalls).toHaveLength(1);
+    expect(createCalls[0]?.changeSummary).toBe("Restored to version 1");
+    expect(createCalls[0]?.createdBy).toBe("user");
+    expect(createCalls[0]?.parentVersionId).toBe("v2"); // parent is whatever was current, not the restored version
+    expect(updateCalls).toHaveLength(1);
+    // The workflow's currentVersionId must repoint to the newly created row,
+    // not to "v1" (the id of the version being restored FROM).
+    expect(updateCalls[0]?.currentVersionId).toBe(createCalls[0]?.id);
+  });
+
+  it("writes nothing when the target graph fails re-validation against the current catalog", async () => {
+    const { db, createCalls } = seedTwoVersions();
+    // A catalog that no longer recognizes slack.send_message simulates a node
+    // type being retired after v2 was created.
+    const shrunkCatalog = CATALOG.filter((c) => c.type !== "slack.send_message");
+
+    const result = await restoreVersion(db as unknown as PrismaClient, "wf1", 2, shrunkCatalog);
+
+    expect("error" in result).toBe(true);
+    if ("error" in result) {
+      expect(result.error.some((e) => e.code === "UNKNOWN_NODE_TYPE")).toBe(true);
+    }
+    expect(createCalls).toHaveLength(0);
+  });
+
+  it("throws when the target version does not exist", async () => {
+    const { db } = seedTwoVersions();
+
+    await expect(restoreVersion(db as unknown as PrismaClient, "wf1", 99, CATALOG)).rejects.toThrow(
+      /not found/,
+    );
+  });
+
+  it("throws when the workflow does not exist", async () => {
+    const { db } = seedTwoVersions();
+
+    await expect(
+      restoreVersion(db as unknown as PrismaClient, "does-not-exist", 1, CATALOG),
     ).rejects.toThrow(/not found/);
   });
 });

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaClient } from "@prisma/client";
-import { applyVersion } from "../version-applier.js";
+import { applyVersion, restoreVersion } from "../version-applier.js";
 import type { CatalogEntry, Operation } from "../types.js";
 
 // Real-database integration test — exercises applyVersion end-to-end against
@@ -98,5 +98,23 @@ describe.skipIf(!RUN_DB_INTEGRATION_TESTS)("applyVersion (integration)", () => {
 
     expect("error" in result).toBe(true);
     expect(after).toBe(before);
+  });
+
+  it("restoreVersion re-saves an earlier version as a new one against the real DB", async () => {
+    // At this point workflowId has version 1 (from the first test above) —
+    // restoring version 1 onto itself should still create version 2.
+    const before = await prisma.workflowVersion.count({ where: { workflowId } });
+    const result = await restoreVersion(prisma, workflowId, 1, CATALOG);
+    const after = await prisma.workflowVersion.count({ where: { workflowId } });
+
+    expect("error" in result).toBe(false);
+    expect(after - before).toBe(1);
+    if (!("error" in result)) {
+      const created = await prisma.workflowVersion.findUniqueOrThrow({
+        where: { workflowId_version: { workflowId, version: result.version } },
+      });
+      expect(created.changeSummary).toBe("Restored to version 1");
+      expect(created.createdBy).toBe("user");
+    }
   });
 });
