@@ -82,7 +82,7 @@ export function registerRunRoutes(app: FastifyInstance): void {
           },
         },
       });
-      clearRunState(runId);
+      await clearRunState(runId);
       throw new ApiErrorException(
         "VALIDATION_FAILED",
         "The proposal no longer validates against the current workflow.",
@@ -100,7 +100,7 @@ export function registerRunRoutes(app: FastifyInstance): void {
       data: { workflowId, version: result.version, graph: result.graph, diff },
     });
     await appendEvent(runId, { event: "run.completed", data: { runId } });
-    clearRunState(runId);
+    await clearRunState(runId);
 
     return { status: "approved", version: result.version };
   });
@@ -130,7 +130,7 @@ export function registerRunRoutes(app: FastifyInstance): void {
       },
     });
     await appendEvent(runId, { event: "run.completed", data: { runId } });
-    clearRunState(runId);
+    await clearRunState(runId);
 
     return { status: "rejected" };
   });

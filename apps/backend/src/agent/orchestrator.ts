@@ -88,7 +88,7 @@ export async function runOrchestrator(
   if (outcome === DEADLINE) {
     await appendEvent(runId, { event: "run.timeout", data: { runId, draftAvailable: false } });
     await prisma.run.update({ where: { id: runId }, data: { status: "timed_out" } }).catch(() => undefined);
-    clearRunState(runId);
+    await clearRunState(runId);
   }
 }
 
@@ -194,7 +194,7 @@ async function mainLoop(
             },
           });
           await prisma.run.update({ where: { id: runId }, data: { status: "failed" } });
-          clearRunState(runId);
+          await clearRunState(runId);
           return;
         case "finish":
           break; // switch-break only; falls through to the shared loop-break below
@@ -215,13 +215,13 @@ async function mainLoop(
   await persistAssistantMessage(conversationId, runId, accumulatedText);
   await appendEvent(runId, { event: "run.completed", data: { runId } });
   await prisma.run.update({ where: { id: runId }, data: { status: "succeeded" } });
-  clearRunState(runId);
+  await clearRunState(runId);
 }
 
 async function cancelRun(runId: string): Promise<void> {
   await appendEvent(runId, { event: "run.cancelled", data: { runId } });
   await prisma.run.update({ where: { id: runId }, data: { status: "cancelled" } }).catch(() => undefined);
-  clearRunState(runId);
+  await clearRunState(runId);
 }
 
 type DeltaOutcome =
@@ -268,7 +268,7 @@ async function handleDelta(
   });
   if (!(await tick(runId, 250))) return { kind: "cancelled" };
 
-  const result = executeTool(toolCtx, delta.tool, delta.input);
+  const result = await executeTool(toolCtx, delta.tool, delta.input);
   await appendEvent(
     runId,
     result.ok
@@ -319,7 +319,7 @@ async function handleProposal(
         data: { runId, error: { code: "VALIDATION_FAILED", message: "Commit-time validation failed." } },
       });
       await prisma.run.update({ where: { id: runId }, data: { status: "failed" } });
-      clearRunState(runId);
+      await clearRunState(runId);
       return;
     }
     await appendEvent(runId, {
@@ -329,7 +329,7 @@ async function handleProposal(
     await persistAssistantMessage(conversationId, runId, proposal.summary);
     await appendEvent(runId, { event: "run.completed", data: { runId } });
     await prisma.run.update({ where: { id: runId }, data: { status: "succeeded" } });
-    clearRunState(runId);
+    await clearRunState(runId);
     return;
   }
 

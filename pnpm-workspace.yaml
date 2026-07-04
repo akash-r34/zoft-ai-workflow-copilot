@@ -6,6 +6,12 @@ allowBuilds:
   '@prisma/client': true
   '@prisma/engines': true
   esbuild: true
+  # msgpackr-extract is ioredis's optional native perf optimization for
+  # msgpack encoding (used internally, not by our own code); it has a pure-JS
+  # fallback, so skipping its native build keeps installs simpler/more
+  # portable (incl. across Docker build architectures) at a negligible
+  # runtime cost.
+  msgpackr-extract: false
   prisma: true
   unrs-resolver: true
 

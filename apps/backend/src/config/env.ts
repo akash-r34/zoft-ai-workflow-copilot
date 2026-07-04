@@ -18,7 +18,11 @@ const EnvSchema = z.object({
   HOST: z.string().default("0.0.0.0"),
   LOG_LEVEL: z.string().default("info"),
   DATABASE_URL: z.string().min(1),
-  REDIS_URL: z.string().optional(),
+  // Was optional — Redis is now a hard runtime dependency (the SSE pub/sub
+  // bridge and BullMQ workers both need it), so it gets the same
+  // local-Docker-default treatment as DATABASE_URL rather than silently
+  // doing without.
+  REDIS_URL: z.string().default("redis://localhost:6379"),
   LLM_PROVIDER: z.enum(["mock", "anthropic"]).default("mock"),
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_MODEL: z.string().default("claude-opus-4-8"),
@@ -41,6 +45,19 @@ const EnvSchema = z.object({
     .default("true")
     .transform((v) => v === "true"),
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
+  // providers/circuit-breaker.ts: consecutive-failure threshold before a
+  // provider's breaker trips open, and how long it stays open before
+  // allowing one half-open trial.
+  PROVIDER_FAILURE_THRESHOLD: z.coerce.number().int().positive().default(3),
+  PROVIDER_BREAKER_COOLDOWN_MS: z.coerce.number().int().positive().default(30_000),
+  // workers/archival-worker.ts: PRD v1.1 Decision #3 — retain all versions,
+  // archive (never delete) those older than this many days. Cron pattern is
+  // BullMQ's native repeatable-job schedule (no separate cron dependency).
+  ARCHIVE_AFTER_DAYS: z.coerce.number().int().positive().default(90),
+  ARCHIVE_CRON: z.string().default("0 3 * * *"),
+  // workers/main.ts: BullMQ Worker concurrency, shared by all three queues
+  // (embedding/validation/archival) unless a queue needs its own override.
+  WORKER_CONCURRENCY: z.coerce.number().int().positive().default(2),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
