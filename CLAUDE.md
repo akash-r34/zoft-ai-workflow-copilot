@@ -141,18 +141,24 @@ merging.
 |-------|-------------|--------|
 | 0 | Monorepo scaffold, contract package, Docker infra | ✅ Done |
 | 1 | Prisma schema, node catalog seed, deterministic core + tests | ✅ Done |
-| 2 | LLM provider abstraction, agent loop, RAG, self-correction | Next |
-| 3 | SSE streaming, BullMQ workers, cancellation, circuit breaker | — |
+| 2 | LLM provider abstraction, agent loop, RAG, self-correction | ✅ Done (core) — advanced pieces in `REMAINING.md` |
+| 3 | SSE streaming, BullMQ workers, cancellation, circuit breaker | ✅ Done (core) — advanced pieces in `REMAINING.md` |
 | 4 | Frontend chat core, SSE client, activity timeline | ✅ Done (built early, against a mock backend — see below) |
 | 5 | React Flow viz, diff highlight, version history, failure states | ✅ Done (built early, against a mock backend — see below) |
-| 6 | Production Dockerfiles, architecture docs, API docs, demo video | — |
+| 6 | Production Dockerfiles, architecture docs, API docs, demo video | — (see `REMAINING.md`) |
 
 **Note on ordering:** Phases 4–5 (the frontend) were built out of sequence, ahead of
 the backend's Phase 2–3, against a self-contained mock backend
 (`apps/frontend/mock/`) that implements the real `packages/contract` REST + SSE
-surface. This is a deliberate deviation from the plan's phase order, not a change to
-the plan itself — Phase 2 (backend AI orchestration) is still the next backend
-milestone. Detail: `.claude/memory/build-phases.md`.
+surface. Phase 2–3 (core) has since landed: a real Postgres-backed Fastify backend
+with real REST + SSE, a real agent loop driven by the deterministic `MockProvider`,
+and (per PRD v1.1 Decision #1) a mandatory human approval gate between validation
+and commit. The frontend runs against it with no changes beyond the new
+`ApprovalPanel` UI the approval gate itself required. `apps/frontend/mock/` is kept
+as a faithful, independent peer implementation (both now emit `workflow.proposed`
+and expose `/approve`/`/reject`), not replaced. Detail: `.claude/memory/build-phases.md`.
+Deferred advanced pieces (real `AnthropicProvider`, provider circuit breaker,
+pgvector RAG, BullMQ workers, all of Phase 6): `REMAINING.md` at repo root.
 
 Per-phase detail (what each adds, decisions made, deviations from spec):
 `.claude/memory/build-phases.md`.

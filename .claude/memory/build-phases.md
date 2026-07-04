@@ -7,11 +7,14 @@ Referenced from the root `CLAUDE.md`. Full design documents per phase live in `P
 |-------|-------------|--------|
 | 0 | Monorepo scaffold, contract package, Docker infra | ✅ Done |
 | 1 | Prisma schema, node catalog seed, deterministic core + tests | ✅ Done |
-| 2 | LLM provider abstraction, agent loop, RAG, self-correction | Next |
-| 3 | SSE streaming, BullMQ workers, cancellation, circuit breaker | — |
+| 2 | LLM provider abstraction, agent loop, RAG, self-correction | ✅ Done (core) — see below; advanced pieces in `REMAINING.md` |
+| 3 | SSE streaming, BullMQ workers, cancellation, circuit breaker | ✅ Done (core) — see below; advanced pieces in `REMAINING.md` |
 | 4 | Frontend chat core, SSE client, activity timeline | ✅ Done (out of order, see below) |
 | 5 | React Flow viz, diff highlight, version history, failure states | ✅ Done (out of order, see below) |
-| 6 | Production Dockerfiles, architecture docs, API docs, demo video | — |
+| 6 | Production Dockerfiles, architecture docs, API docs, demo video | — (see `REMAINING.md`) |
+
+**PRD v1.1 addition, built alongside Phase 2–3 (core):** the mandatory human
+approval gate (Decision #1) — see the dedicated section below.
 
 ## Phase 0 (done)
 
@@ -37,23 +40,69 @@ handover spec, and verbatim test output: `PHASE1_DONE.md` at repo root. Notably:
 `node_definition.embedding` (pgvector) column was deliberately deferred to Phase 3
 rather than added in the `init` migration.
 
-## Phase 2 (next)
+## Phase 2–3 (done, core) + the PRD v1.1 approval gate
 
-Per `Plans/00-master-plan.md` / the LLM provider + agent loop plan: LLM provider
-abstraction (`MockProvider`, `AnthropicProvider`, `ProviderRouter`), agent tool
-registry (`search_nodes`, `get_node_schema`, `get_current_workflow`,
-`propose_operations`, `commit` — see `.claude/memory/backend-architecture.md`), RAG
-over the node catalog, bounded self-correction loop (max 3 repair rounds). Needs a
-service-layer wrapper around `applyVersion` that loads `CatalogEntry[]` from
-`node_definition` — flagged as an open question in `PHASE1_DONE.md`.
+Built a real, Postgres-backed Fastify backend that the existing frontend (Phases
+4–5) runs against unchanged — no frontend behavior change beyond the approval-gate
+UI described below. Added under `apps/backend/src/`:
+
+- `config/env.ts` — zod-validated env (`SELF_CORRECTION_BUDGET` default 1 per PRD
+  v1.1 Decision #2, `RUN_DEADLINE_MS`, `APPROVAL_REQUIRED` default true, `LLM_PROVIDER`)
+- `catalog/catalog-service.ts` — loads/searches the seeded node catalog
+- `dto/mappers.ts`, `dto/diff.ts` — Prisma row → `@zoft/contract` DTOs, graph diffing
+- `providers/types.ts`, `providers/mock-provider.ts`, `providers/factory.ts` — the
+  `LlmProvider` abstraction (shaped after Anthropic's streaming/tool-use API so a
+  real provider is a drop-in second implementation) and the default, zero-key
+  `MockProvider`, which ports `apps/frontend/mock/scenarios.ts`'s six scenarios +
+  five failure injections into a provider that drives the **real** agent loop and
+  **real** validator, not a fake
+- `tools/` — `read-tools.ts` (search_nodes, get_node_schema, get_current_workflow),
+  `propose-operations.ts` (validates via the real core, never writes),
+  `commit.ts` (the only agent-facing caller of `core/version-applier.ts`),
+  `registry.ts` (dispatch + the "unknown tool" reliability check)
+- `agent/orchestrator.ts` — the bounded self-correction loop, run deadline race,
+  cancellation checks, and the approval-gate pause (see below)
+- `runs/event-bus.ts`, `runs/sse.ts`, `runs/run-service.ts` — persisted,
+  replayable (`Last-Event-ID`) SSE event log; run/message lifecycle
+- `routes/*` — the full REST surface, byte-compatible with
+  `apps/frontend/mock/server.ts`'s responses and error envelope
+- `core/version-applier.ts` gained `restoreVersion` (re-saves an earlier version
+  verbatim through the same single writer, re-validating first) — the only other
+  addition to that file; `applyVersion` itself is unchanged in behavior
+
+**The approval gate (PRD v1.1 Decision #1):** the orchestrator validates a
+candidate change via `propose_operations` but does not commit — it emits
+`workflow.proposed` (new SSE event, `packages/contract/src/events.ts`) and pauses
+(run stays `running`, kept alive by heartbeats) until `POST /api/runs/:id/approve`
+or `/reject` (new endpoints, `packages/contract/src/api.ts`) resolves it. Approve
+calls `tools/commit.ts` (writes exactly one new version); reject discards the
+proposal and persists an assistant message, writing nothing. This required
+coordinated changes across all four packages: `packages/contract` (the new
+event + DTOs), `apps/backend` (the pause/resume + two routes), `apps/frontend/mock`
+(kept as a faithful peer — same pause/approve/reject behavior, in-memory), and
+`apps/frontend/src` (a new `ApprovalPanel` component, `useApproveRun`/`useRejectRun`
+hooks, and a `selectPendingProposal` selector in `stores/run-store.ts`).
+
+Verified end-to-end against the real backend: unit tests (Vitest, incl. a full
+`MockProvider` scenario-by-scenario suite), DB integration tests (Prisma against
+the Docker Postgres), and a 33-check HTTP/SSE script covering all six scenarios,
+all five failure injections, the approval gate (including double-approve/
+double-reject), cancellation mid-flight, `Last-Event-ID` reconnect/replay, and
+REST error/edge cases.
+
+Advanced Phase 2–3 pieces (real `AnthropicProvider`, a real `ProviderRouter`
+circuit breaker, pgvector RAG + embedding worker, BullMQ workers + Redis pub/sub +
+DLQ/idempotency, version archival) are deliberately deferred — see `REMAINING.md`
+for the full list and rationale.
 
 ## Phases 4–5 (done, out of order)
 
-Built ahead of the backend's Phase 2–3 (which don't exist yet — no HTTP routes, no
-SSE emission), against a self-contained mock backend (`apps/frontend/mock/`) that
-implements the real `packages/contract` REST + SSE surface. This is a deliberate
-sequencing deviation, not a change to the backend's phase order — Phase 2 is still
-the next **backend** milestone. Added:
+Built ahead of the backend's Phase 2–3 (which didn't exist at the time — no HTTP
+routes, no SSE emission), against a self-contained mock backend
+(`apps/frontend/mock/`) that implements the real `packages/contract` REST + SSE
+surface. This was a deliberate sequencing deviation, not a change to the backend's
+phase order; Phase 2–3 (core) has since landed (see above) and the frontend runs
+against it unchanged, modulo the approval-gate UI added alongside that work. Added:
 - `apps/frontend/mock/server.ts`, `apps/frontend/mock/scenarios.ts` — the mock
   backend and its scripted "AI" (keyword-driven scenario engine covering all six
   brief scenarios and five failure injections)
@@ -70,14 +119,9 @@ root. Detail on the implemented architecture: `.claude/memory/frontend-architect
 Nothing in `apps/frontend/src` imports from `apps/frontend/mock/` — swapping to the
 real backend is a `NEXT_PUBLIC_API_URL` change only.
 
-## Phase 3 and 6
+## Phase 6
 
-Not yet started. See `Plans/` for full specs:
-- Phase 3: SSE streaming, BullMQ workers (embedding generation off the request path —
-  this is where the `node_definition.embedding` column finally gets added), request
-  cancellation, provider circuit breaker. The frontend already expects this
-  contract exactly (built against a mock of it) — no frontend changes needed when
-  it lands.
-- Phase 6: Production Dockerfiles, architecture docs, API docs, demo video. Note:
-  `apps/frontend/mock/` is dev-only and should not be containerized alongside the
-  real backend.
+Not yet started. See `Plans/05-deliverables.md` for the full spec: production
+Dockerfiles, architecture docs, API docs, demo video. Note: `apps/frontend/mock/`
+is dev-only and should not be containerized alongside the real backend. Full list
+of what's deferred and why: `REMAINING.md` at repo root.
