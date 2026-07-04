@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { SseEvent } from "@zoft/contract";
-import { selectStreamedText, selectTerminalFailureEvent, useRunStore } from "../stores/run-store";
+import type { SseEvent, WorkflowGraph } from "@zoft/contract";
+import {
+  selectPendingProposal,
+  selectStreamedText,
+  selectTerminalFailureEvent,
+  useRunStore,
+} from "../stores/run-store";
+
+const EMPTY_GRAPH: WorkflowGraph = { nodes: [], edges: [] };
+const EMPTY_DIFF = { added: { nodes: [], edges: [] }, removed: { nodes: [], edges: [] }, changed: [] };
 
 describe("run-store", () => {
   beforeEach(() => {
@@ -95,6 +103,41 @@ describe("run-store", () => {
     useRunStore.getState().startRun("run-1", "conv-1");
     useRunStore.getState().addEvent({ event: "run.completed", seq: 1, data: { runId: "run-1" } });
     expect(selectTerminalFailureEvent(useRunStore.getState().events)).toBeUndefined();
+  });
+
+  it("selectPendingProposal surfaces a workflow.proposed event awaiting a decision", () => {
+    useRunStore.getState().startRun("run-1", "conv-1");
+    const { addEvent } = useRunStore.getState();
+    addEvent({ event: "run.started", seq: 1, data: { runId: "run-1" } });
+    addEvent({
+      event: "workflow.proposed",
+      seq: 2,
+      data: { workflowId: "wf-1", version: 1, graph: EMPTY_GRAPH, diff: EMPTY_DIFF, summary: "Do the thing" },
+    });
+    const proposal = selectPendingProposal(useRunStore.getState().events);
+    expect(proposal?.summary).toBe("Do the thing");
+  });
+
+  it("selectPendingProposal returns undefined once approved (workflow.updated supersedes it)", () => {
+    useRunStore.getState().startRun("run-1", "conv-1");
+    const { addEvent } = useRunStore.getState();
+    addEvent({
+      event: "workflow.proposed",
+      seq: 1,
+      data: { workflowId: "wf-1", version: 1, graph: EMPTY_GRAPH, diff: EMPTY_DIFF, summary: "Do the thing" },
+    });
+    addEvent({
+      event: "workflow.updated",
+      seq: 2,
+      data: { workflowId: "wf-1", version: 1, graph: EMPTY_GRAPH, diff: EMPTY_DIFF },
+    });
+    expect(selectPendingProposal(useRunStore.getState().events)).toBeUndefined();
+  });
+
+  it("selectPendingProposal returns undefined when no proposal has been made", () => {
+    useRunStore.getState().startRun("run-1", "conv-1");
+    useRunStore.getState().addEvent({ event: "run.started", seq: 1, data: { runId: "run-1" } });
+    expect(selectPendingProposal(useRunStore.getState().events)).toBeUndefined();
   });
 
   it("reset clears the run back to its initial, unscoped state", () => {

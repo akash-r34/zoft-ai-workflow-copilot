@@ -104,6 +104,33 @@ export function selectIsTerminal(outcome: RunOutcome): boolean {
   return outcome !== null && outcome !== "running";
 }
 
+/**
+ * PRD v1.1 Decision #1 — the mandatory human approval gate. Returns the
+ * latest workflow.proposed payload IF it hasn't already been superseded by a
+ * workflow.updated (i.e. approved) event with a later seq. Once the run
+ * reaches ANY terminal outcome (approved -> workflow.updated + run.completed,
+ * or rejected -> run.completed with no workflow.updated), the caller should
+ * additionally check `selectIsTerminal(outcome)` and stop rendering this —
+ * kept as a separate check rather than folded in here so this stays a pure
+ * function of `events` alone, consistent with every other selector in this file.
+ */
+export function selectPendingProposal(
+  events: SseEvent[],
+): Extract<SseEvent, { event: "workflow.proposed" }>["data"] | undefined {
+  let proposed: Extract<SseEvent, { event: "workflow.proposed" }>["data"] | undefined;
+  let proposedSeq = -1;
+  let updatedSeq = -1;
+  for (const evt of events) {
+    if (evt.event === "workflow.proposed") {
+      proposed = evt.data;
+      proposedSeq = evt.seq;
+    } else if (evt.event === "workflow.updated") {
+      updatedSeq = evt.seq;
+    }
+  }
+  return proposed && proposedSeq > updatedSeq ? proposed : undefined;
+}
+
 type TerminalEvent = Extract<SseEvent, { event: "run.failed" | "run.timeout" | "run.cancelled" }>;
 
 export function selectTerminalFailureEvent(events: SseEvent[]): TerminalEvent | undefined {

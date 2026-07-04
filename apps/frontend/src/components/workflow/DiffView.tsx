@@ -1,6 +1,11 @@
-import type { WorkflowDiffDto } from "@zoft/contract";
+import type { WorkflowDiff } from "@zoft/contract";
 
-export function DiffView({ diff }: { diff: WorkflowDiffDto }) {
+// Accepts the plain WorkflowDiff shape (added/removed/changed) rather than
+// the REST-only WorkflowDiffDto (which adds from/to version numbers) — this
+// component never renders those, and the workflow.proposed SSE event carries
+// a WorkflowDiff, not a WorkflowDiffDto. A WorkflowDiffDto still satisfies
+// this prop structurally, so VersionHistory's existing usage is unaffected.
+export function DiffView({ diff }: { diff: WorkflowDiff }) {
   const hasChanges =
     diff.added.nodes.length > 0 ||
     diff.removed.nodes.length > 0 ||

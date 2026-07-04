@@ -2,11 +2,13 @@
 // function returns a @zoft/contract DTO — this file is the only place that
 // knows the wire shape of an HTTP response.
 import type {
+  ApproveRunResponseDto,
   ConversationDto,
   ErrorEnvelope,
   MessageDto,
   CreateRunResponseDto,
   NodeDefinitionDto,
+  RejectRunResponseDto,
   WorkflowDiffDto,
   WorkflowDto,
   WorkflowGraph,
@@ -75,6 +77,12 @@ export const api = {
 
   cancelRun: (runId: string) =>
     request<{ status: "cancelled" }>(`/api/runs/${runId}/cancel`, { method: "POST" }),
+
+  approveRun: (runId: string) =>
+    request<ApproveRunResponseDto>(`/api/runs/${runId}/approve`, { method: "POST" }),
+
+  rejectRun: (runId: string) =>
+    request<RejectRunResponseDto>(`/api/runs/${runId}/reject`, { method: "POST" }),
 
   getWorkflow: (workflowId: string) => request<WorkflowDto>(`/api/workflows/${workflowId}`),
 
