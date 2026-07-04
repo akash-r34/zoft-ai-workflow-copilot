@@ -40,6 +40,8 @@ export interface StoredWorkflowVersion {
 
 export type RunStatus = "pending" | "running" | "succeeded" | "failed" | "cancelled" | "timed_out";
 
+export type ProposalStatus = "pending" | "approved" | "rejected";
+
 export interface StoredRun {
   id: string;
   conversationId: string;
@@ -47,6 +49,13 @@ export interface StoredRun {
   status: RunStatus;
   cancelRequested: boolean;
   createdAt: string;
+  // PRD v1.1 Decision #1 — the mandatory human approval gate. Set once a
+  // scenario validates a candidate graph and emits workflow.proposed; the
+  // run stays "running" until POST .../approve or .../reject resolves it.
+  // Mirrors apps/backend/prisma/schema.prisma's Run.proposed* columns.
+  proposedGraph?: WorkflowGraph;
+  proposalSummary?: string;
+  proposalStatus?: ProposalStatus;
 }
 
 export interface StoreSnapshot {

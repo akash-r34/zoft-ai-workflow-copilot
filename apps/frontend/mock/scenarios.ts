@@ -1,7 +1,8 @@
 // The mock's deterministic "AI". No LLM call here — a keyword match on the
 // user's message picks a scripted sequence of SSE events (with realistic
-// pacing) that mirrors what the real agent loop in Plans/02-backend.md would
-// emit: plan -> search nodes -> read schema -> validate -> propose -> commit.
+// pacing) that mirrors what the real agent loop in apps/backend/src/agent/
+// orchestrator.ts emits: plan -> search nodes -> read schema -> validate ->
+// propose -> (pause for human approval, PRD v1.1 Decision #1) -> commit.
 // Every event goes through store.appendEvent, so it is persisted for replay
 // and pushed to any live subscriber in the same call.
 import { randomUUID } from "node:crypto";
@@ -11,9 +12,9 @@ import { EMPTY, cloneGraph, diffGraphs, makeEdge, makeNode } from "./graph-ops.j
 import {
   addMessage,
   appendEvent,
-  appendVersion,
   getCurrentVersion,
   isCancelRequested,
+  setPendingProposal,
   setRunStatus,
 } from "./store.js";
 
@@ -255,17 +256,24 @@ async function completeBuild(
   });
 
   if (!(await tick(runId, 300))) return;
-  const newVersion = appendVersion(workflowId, mutation.graph, "ai", mutation.summary);
+  // PRD v1.1 Decision #1 — pause here instead of committing. The candidate
+  // graph is validated (simulated above) but NOT yet written; it waits as a
+  // pending proposal until POST .../approve or .../reject resolves it (see
+  // server.ts). This mirrors the real backend's agent/orchestrator.ts
+  // handleProposal exactly, so the frontend's approval-gate UI (Part C)
+  // works identically against either backend.
   const diff = diffGraphs(before, mutation.graph);
-  appendEvent(runId, {
-    event: "workflow.updated",
-    data: { workflowId, version: newVersion.version, graph: mutation.graph, diff },
-  });
+  const previewVersion = (getCurrentVersion(workflowId)?.version ?? 0) + 1;
+  setPendingProposal(runId, { graph: mutation.graph, summary: mutation.summary });
 
   if (!(await emitProse(runId, mutation.summary, 25))) return;
   addMessage({ conversationId, role: "assistant", content: mutation.summary, runId });
-  appendEvent(runId, { event: "run.completed", data: { runId } });
-  setRunStatus(runId, "succeeded");
+  appendEvent(runId, {
+    event: "workflow.proposed",
+    data: { workflowId, version: previewVersion, graph: mutation.graph, diff, summary: mutation.summary },
+  });
+  // Run stays "running" — the heartbeat (server.ts) keeps the stream alive
+  // until the approval endpoint resolves it.
 }
 
 async function runBuildScenario(

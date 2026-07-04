@@ -8,10 +8,12 @@ import cors from "@fastify/cors";
 import Fastify from "fastify";
 import { ZodError } from "zod";
 import type {
+  ApproveRunResponseDto,
   ConversationDto,
   CreateRunResponseDto,
   ErrorCode,
   MessageDto,
+  RejectRunResponseDto,
   SseEvent,
   WorkflowDto,
   WorkflowVersionSummaryDto,
@@ -22,8 +24,11 @@ import {
   SimulateStripePaymentBodySchema,
 } from "@zoft/contract";
 import { runScenario } from "./scenarios.js";
+import { diffGraphs } from "./graph-ops.js";
 import {
   addMessage,
+  appendEvent,
+  appendVersion,
   createConversation,
   createRun,
   diffVersions,
@@ -32,6 +37,7 @@ import {
   getCurrentVersion,
   getEventsSince,
   getNodeDefinitions,
+  getPendingProposal,
   getRun,
   getVersionByNumber,
   getWorkflow,
@@ -39,7 +45,9 @@ import {
   listMessages,
   listVersions,
   requestCancel,
+  resolveProposal,
   restoreVersion,
+  setRunStatus,
   subscribe,
 } from "./store.js";
 import type {
@@ -169,11 +177,19 @@ async function main(): Promise<void> {
 
     reply.hijack();
     const res = reply.raw;
+    // reply.hijack() bypasses Fastify's send pipeline entirely, which is
+    // where @fastify/cors's onRequest hook stages Access-Control-Allow-Origin
+    // — without setting it explicitly here, a real cross-origin browser
+    // (frontend on :3000, this mock on :3001) blocks the stream outright.
+    // Found via real Playwright-driven browser testing (see PHASE4_5_DONE.md),
+    // not typecheck/lint/unit tests.
     res.writeHead(200, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
       "X-Accel-Buffering": "no",
+      "Access-Control-Allow-Origin": "http://localhost:3000",
+      Vary: "Origin",
     });
     res.write(": connected\n\n");
 
@@ -204,6 +220,63 @@ async function main(): Promise<void> {
     const run = requestCancel(runId);
     if (!run) throw new ApiErrorException("RUN_NOT_FOUND", `run ${runId} not found`, 404);
     return { status: "cancelled" as const };
+  });
+
+  // ── Approval gate (PRD v1.1 Decision #1) ─────────────────────────────
+  app.post("/api/runs/:runId/approve", async (request) => {
+    const { runId } = request.params as { runId: string };
+    const run = getRun(runId);
+    if (!run) throw new ApiErrorException("RUN_NOT_FOUND", `run ${runId} not found`, 404);
+    const proposal = getPendingProposal(runId);
+    if (!proposal) {
+      throw new ApiErrorException(
+        "VALIDATION_FAILED",
+        `run ${runId} has no pending proposal to approve`,
+        400,
+      );
+    }
+
+    const before = getCurrentVersion(run.workflowId)?.graph ?? proposal.graph;
+    const newVersion = appendVersion(run.workflowId, proposal.graph, "ai", proposal.summary);
+    const diff = diffGraphs(before, proposal.graph);
+    resolveProposal(runId, "approved");
+    setRunStatus(runId, "succeeded");
+
+    appendEvent(runId, {
+      event: "workflow.updated",
+      data: { workflowId: run.workflowId, version: newVersion.version, graph: proposal.graph, diff },
+    });
+    appendEvent(runId, { event: "run.completed", data: { runId } });
+
+    const response: ApproveRunResponseDto = { status: "approved", version: newVersion.version };
+    return response;
+  });
+
+  app.post("/api/runs/:runId/reject", async (request) => {
+    const { runId } = request.params as { runId: string };
+    const run = getRun(runId);
+    if (!run) throw new ApiErrorException("RUN_NOT_FOUND", `run ${runId} not found`, 404);
+    const proposal = getPendingProposal(runId);
+    if (!proposal) {
+      throw new ApiErrorException(
+        "VALIDATION_FAILED",
+        `run ${runId} has no pending proposal to reject`,
+        400,
+      );
+    }
+
+    resolveProposal(runId, "rejected");
+    setRunStatus(runId, "succeeded");
+    addMessage({
+      conversationId: run.conversationId,
+      role: "assistant",
+      content: "Change discarded — nothing was applied.",
+      runId,
+    });
+    appendEvent(runId, { event: "run.completed", data: { runId } });
+
+    const response: RejectRunResponseDto = { status: "rejected" };
+    return response;
   });
 
   // ── Workflows and versions ───────────────────────────────────────────

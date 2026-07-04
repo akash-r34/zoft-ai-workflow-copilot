@@ -228,6 +228,35 @@ export function isCancelRequested(id: string): boolean {
   return snapshot.runs[id]?.cancelRequested ?? false;
 }
 
+// ── Approval gate (PRD v1.1 Decision #1) ─────────────────────────────────
+/** Stashes a validated-but-not-yet-committed candidate graph on the run, pending human approval. */
+export function setPendingProposal(
+  runId: string,
+  proposal: { graph: WorkflowGraph; summary: string },
+): void {
+  const run = snapshot.runs[runId];
+  if (!run) return;
+  run.proposedGraph = cloneGraph(proposal.graph);
+  run.proposalSummary = proposal.summary;
+  run.proposalStatus = "pending";
+  persist();
+}
+
+export function getPendingProposal(
+  runId: string,
+): { graph: WorkflowGraph; summary: string } | undefined {
+  const run = snapshot.runs[runId];
+  if (!run || run.proposalStatus !== "pending" || !run.proposedGraph) return undefined;
+  return { graph: run.proposedGraph, summary: run.proposalSummary ?? "Workflow updated." };
+}
+
+export function resolveProposal(runId: string, status: "approved" | "rejected"): void {
+  const run = snapshot.runs[runId];
+  if (!run) return;
+  run.proposalStatus = status;
+  persist();
+}
+
 // ── Run events (the durable SSE log) ─────────────────────────────────────
 function getOrCreateEventsArray(runId: string): SseEvent[] {
   const existing = snapshot.runEvents[runId];
