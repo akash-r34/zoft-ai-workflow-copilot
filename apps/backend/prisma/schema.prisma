@@ -130,6 +130,25 @@ model Run {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
+  /// Set by POST /api/runs/:id/cancel; the orchestrator's per-step tick
+  /// checks this and emits run.cancelled instead of continuing.
+  cancelRequested Boolean @default(false)
+
+  /// PRD v1.1 Decision #1 — the mandatory human approval gate. Once the
+  /// orchestrator validates a candidate change, it stores the ops that
+  /// produced it here (NOT yet written to workflow_version) and pauses,
+  /// leaving the SSE stream open, until POST .../approve or .../reject
+  /// resolves it. `proposedGraph` duplicates the candidate for display
+  /// parity with the workflow.proposed SSE payload; `proposedOps` is what
+  /// tools/commit.ts replays through the real applyVersion at approval time
+  /// (re-validating against whatever is then current — see runs/run-service.ts).
+  proposedOps     Json?
+  proposedGraph   Json?
+  proposalSummary String?
+  /// null (no proposal ever made, e.g. an explain-only turn) | "pending" |
+  /// "approved" | "rejected"
+  proposalStatus  String?
+
   @@map("run")
 }
 

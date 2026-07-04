@@ -4,6 +4,39 @@ import { validateGraph } from "./validator.js";
 import { EMPTY_GRAPH } from "./types.js";
 import type { CatalogEntry, Operation, ValidationError, WorkflowGraph } from "./types.js";
 
+async function writeNewVersion(
+  tx: Pick<PrismaClient, "workflow" | "workflowVersion">,
+  workflowId: string,
+  currentVersionId: string | null,
+  candidateGraph: WorkflowGraph,
+  createdBy: "user" | "ai",
+  changeSummary: string,
+): Promise<{ version: number; graph: WorkflowGraph }> {
+  const agg = await tx.workflowVersion.aggregate({
+    where: { workflowId },
+    _max: { version: true },
+  });
+  const nextVersion = (agg._max.version ?? 0) + 1;
+
+  const created = await tx.workflowVersion.create({
+    data: {
+      workflowId,
+      version: nextVersion,
+      graph: candidateGraph as unknown as Prisma.InputJsonValue,
+      createdBy,
+      changeSummary,
+      parentVersionId: currentVersionId,
+    },
+  });
+
+  await tx.workflow.update({
+    where: { id: workflowId },
+    data: { currentVersionId: created.id },
+  });
+
+  return { version: nextVersion, graph: candidateGraph };
+}
+
 /**
  * Applies a batch of operations to a workflow's current graph and, if the
  * result validates cleanly, persists it as a new immutable `workflow_version`
@@ -61,28 +94,57 @@ export async function applyVersion(
       return { error: result.errors };
     }
 
-    const agg = await tx.workflowVersion.aggregate({
-      where: { workflowId },
-      _max: { version: true },
-    });
-    const nextVersion = (agg._max.version ?? 0) + 1;
+    return writeNewVersion(tx, workflowId, workflow.currentVersionId, candidateGraph, createdBy, changeSummary);
+  });
+}
 
-    const created = await tx.workflowVersion.create({
-      data: {
-        workflowId,
-        version: nextVersion,
-        graph: candidateGraph as unknown as Prisma.InputJsonValue,
-        createdBy,
-        changeSummary,
-        parentVersionId: workflow.currentVersionId,
-      },
-    });
+/**
+ * Re-saves an existing version's graph verbatim as a new version — the
+ * deterministic write path behind "restore to version N" (a *user* action,
+ * not an AI proposal, but still required to go through this same single
+ * writer so every graph in the database, however it got there, has a
+ * traceable parent version). Still re-validates before writing, even though
+ * a graph that was valid when first created should validate again — this is
+ * the same defense-in-depth the approval gate relies on at commit time (see
+ * routes/runs.ts's POST /approve).
+ *
+ * @param targetVersion - the version number to restore; must already exist
+ * @throws if `workflowId` or `targetVersion` does not exist
+ * @returns `{ version, graph }` for the newly created version on success, or
+ *   `{ error }` — and no writes — if the target graph fails re-validation
+ */
+export async function restoreVersion(
+  prisma: PrismaClient,
+  workflowId: string,
+  targetVersion: number,
+  catalog: CatalogEntry[],
+): Promise<{ version: number; graph: WorkflowGraph } | { error: ValidationError[] }> {
+  return prisma.$transaction(async (tx) => {
+    const workflow = await tx.workflow.findUnique({ where: { id: workflowId } });
+    if (!workflow) {
+      throw new Error(`Workflow "${workflowId}" not found`);
+    }
 
-    await tx.workflow.update({
-      where: { id: workflowId },
-      data: { currentVersionId: created.id },
+    const target = await tx.workflowVersion.findUnique({
+      where: { workflowId_version: { workflowId, version: targetVersion } },
     });
+    if (!target) {
+      throw new Error(`Version ${targetVersion} not found for workflow "${workflowId}"`);
+    }
 
-    return { version: nextVersion, graph: candidateGraph };
+    const targetGraph = target.graph as unknown as WorkflowGraph;
+    const result = validateGraph(targetGraph, catalog);
+    if (!result.valid) {
+      return { error: result.errors };
+    }
+
+    return writeNewVersion(
+      tx,
+      workflowId,
+      workflow.currentVersionId,
+      targetGraph,
+      "user",
+      `Restored to version ${targetVersion}`,
+    );
   });
 }

@@ -1,24 +1,12 @@
-import Fastify from "fastify";
-import type { WorkflowGraph } from "@zoft/contract";
-
-// WorkflowGraph is imported to confirm @zoft/contract is importable from backend.
-// Used in type position only; no runtime reference needed in this scaffold.
-type _GraphCheck = WorkflowGraph;
-
-const server = Fastify({
-  logger: {
-    level: process.env["LOG_LEVEL"] ?? "info",
-  },
-});
-
-const PORT = Number(process.env["PORT"] ?? 3001);
-const HOST = process.env["HOST"] ?? "0.0.0.0";
+import { buildApp } from "./app.js";
+import { env } from "./config/env.js";
 
 const start = async (): Promise<void> => {
+  const app = await buildApp();
   try {
-    await server.listen({ port: PORT, host: HOST });
+    await app.listen({ port: env.PORT, host: env.HOST });
   } catch (err) {
-    server.log.error(err);
+    app.log.error(err);
     process.exit(1);
   }
 };
