@@ -1,0 +1,8 @@
+Scope: 3 of 4 workspace projects
+packages/contract typecheck$ tsc --project tsconfig.json --noEmit
+packages/contract typecheck: Done
+apps/backend typecheck$ tsc --project tsconfig.json --noEmit
+apps/frontend typecheck$ tsc --project tsconfig.json --noEmit && tsc --project mock/tsconfig.json --noEmit
+apps/backend typecheck: Done
+apps/frontend typecheck: Done
+typecheck exit: 0

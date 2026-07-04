@@ -1,0 +1,28 @@
+Scope: 3 of 4 workspace projects
+packages/contract build$ tsc --project tsconfig.json
+packages/contract build: Done
+apps/backend build$ tsc --project tsconfig.json
+apps/frontend build$ next build
+apps/frontend build:   ▲ Next.js 14.2.35
+apps/frontend build:    Creating an optimized production build ...
+apps/backend build: Done
+apps/frontend build:  ✓ Compiled successfully
+apps/frontend build:    Linting and checking validity of types ...
+apps/frontend build:    Collecting page data ...
+apps/frontend build:    Generating static pages (0/4) ...
+apps/frontend build:    Generating static pages (1/4) 
+apps/frontend build:    Generating static pages (2/4) 
+apps/frontend build:    Generating static pages (3/4) 
+apps/frontend build:  ✓ Generating static pages (4/4)
+apps/frontend build:    Finalizing page optimization ...
+apps/frontend build:    Collecting build traces ...
+apps/frontend build: Route (app)                              Size     First Load JS
+apps/frontend build: ┌ ○ /                                    96.6 kB         190 kB
+apps/frontend build: └ ○ /_not-found                          872 B          88.2 kB
+apps/frontend build: + First Load JS shared by all            87.3 kB
+apps/frontend build:   ├ chunks/5b8f0dd8-575ea9f8bc8acf38.js  53.6 kB
+apps/frontend build:   ├ chunks/749-e3a18294c76ab4c6.js       31.7 kB
+apps/frontend build:   └ other shared chunks (total)          1.93 kB
+apps/frontend build: ○  (Static)  prerendered as static content
+apps/frontend build: Done
+build exit: 0

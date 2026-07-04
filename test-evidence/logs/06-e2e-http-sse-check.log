@@ -1,0 +1,47 @@
+
+1. Six brief scenarios
+  ✓ create: reaches workflow.proposed
+  ✓ create: approve succeeds with version 1
+  ✓ create: exactly one version written
+  ✓ replace: proposes a Teams node via diff
+  ✓ threshold filter: proposes filter.condition node
+  ✓ weekday filter: proposes schedule.weekday_filter node
+  ✓ explain: completes with streamed prose, no proposal
+  ✓ why: completes with an explanation, no proposal
+
+2. Five failure injections
+  ✓ timeout: emits run.timeout
+  ✓ fail: emits validation.error then run.failed
+  ✓ fail: error code is VALIDATION_FAILED
+  ✓ self-correct: emits validation.error, retry, then a valid workflow.proposed
+  ✓ provider-switch: emits provider.switched then still proposes
+  ✓ tool-failure: one tool.result ok:false, then succeeds and proposes
+
+3. Approval gate edge cases
+  ✓ reject: returns status rejected
+  ✓ reject: writes zero versions
+  ✓ double-reject: 400 VALIDATION_FAILED
+  ✓ approve-after-reject: 400 (no pending proposal)
+  ✓ approve: writes exactly one version
+  ✓ double-approve: 400, no extra version written
+
+4. Cancel mid-flight
+  ✓ cancel: accepted
+  ✓ cancel: run ends with run.cancelled, not run.completed
+
+5. Reconnect / replay
+  ✓ replay: got at least one event before disconnect
+  ✓ replay: resumed stream has no duplicate seqs
+  ✓ replay: resumed stream contains no events at/before the given Last-Event-ID
+
+6. REST error / edge cases
+  ✓ unknown conversation -> 404 CONVERSATION_NOT_FOUND
+  ✓ unknown run -> 404 RUN_NOT_FOUND
+  ✓ unknown workflow -> 404 WORKFLOW_NOT_FOUND
+  ✓ empty message content -> 400 VALIDATION_FAILED
+  ✓ diff missing from/to params -> 400
+  ✓ node-definitions search returns matching catalog entries
+  ✓ dev stripe-payment stub echoes amount/currency
+  ✓ health check ok
+
+TOTAL: 33 passed, 0 failed
