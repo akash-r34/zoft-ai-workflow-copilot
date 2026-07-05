@@ -10,6 +10,14 @@ jobs:
   ci:
     name: Lint, typecheck, test
     runs-on: ubuntu-latest
+    env:
+      # config/env.ts requires DATABASE_URL unconditionally and validates it
+      # eagerly at import time (no .env file exists in a fresh CI checkout —
+      # apps/backend/.env is gitignored). A placeholder string satisfies that
+      # check; nothing here actually connects to it, since every test that
+      # touches a real Postgres is gated behind RUN_DB_INTEGRATION_TESTS
+      # (unset here, so those tests skip) — see docs/developer-guide/13-testing.md.
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/zoft?schema=public"
 
     steps:
       - uses: actions/checkout@v4
