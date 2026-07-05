@@ -7,3 +7,7 @@ dist
 coverage
 .DS_Store
 apps/frontend/mock/.data.json
+
+# Large audio assets ship via GitHub Releases, not git (GitHub's 100MB push
+# limit) — see the README's podcast link.
+*.m4a
