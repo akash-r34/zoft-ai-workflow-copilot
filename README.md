@@ -111,6 +111,7 @@ Full walkthrough, verification steps, and a troubleshooting table:
 | [`docs/architecture.md`](docs/architecture.md) | Shorter, outside-reader-facing system design doc — the core invariant and a run's full data flow. |
 | [`docs/api.md`](docs/api.md) | REST + SSE endpoint reference, generated from what's actually implemented. |
 | [`REMAINING.md`](REMAINING.md) | What's deliberately deferred, and exactly why. |
+| [`Zoft_AI_Workflow_Copilot_PRD_v1.1.docx`](Zoft_AI_Workflow_Copilot_PRD_v1.1.docx) ([v1.0](Zoft_AI_Workflow_Copilot_PRD_v1.0.docx)) | The original product requirements doc this build implements — see it for the "why" behind decisions like the mandatory human approval gate and the self-correction budget. v1.1 supersedes v1.0. |
 
 ## Tech Stack
 
